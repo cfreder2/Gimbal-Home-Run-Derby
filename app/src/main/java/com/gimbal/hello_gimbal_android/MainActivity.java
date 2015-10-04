@@ -12,6 +12,10 @@ import com.gimbal.android.PlaceManager;
 import com.gimbal.android.Visit;
 import com.gimbal.android.BeaconSighting;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import android.widget.TextView;
 import android.view.*;
 import android.view.animation.AccelerateInterpolator;
@@ -28,12 +32,13 @@ public class MainActivity extends ActionBarActivity {
     private PlaceManager placeManager;
     private PlaceEventListener placeEventListener;
     private TextView textView;
-    private ArrayList<Integer> rssi_log = new ArrayList<Integer>();
+//    private ArrayList<Integer> rssi_log = new ArrayList<>();
     private TextView resultTextView;
-    private long last_timeread = 0;
-    private long previous_mbr = 0;
+//    private long last_timeread = 0;
+//    private long previous_mbr = 0;
     private long hit_start_time = 0;
     private GameState state;
+    private MySightingManager sightingManager = new MySightingManager(3);
 
     public void selfDestruct(View view) {
         ParticleSystem ps = new ParticleSystem(this, 100, R.drawable.star_pink, 800);
@@ -95,59 +100,96 @@ public class MainActivity extends ActionBarActivity {
 
             @Override
             public void onBeaconSighting(BeaconSighting sighting, List<Visit> visits) {
-                //double dist = 60.978*(Math.log(35.0)-Math.log((sighting.getRSSI()*-1.0)));
-                Integer rssi = sighting.getRSSI();
-                Integer total = 0;
-                long start = sighting.getTimeInMillis();
-                long milliseconds_between_readings = start - last_timeread;
+//                Integer rssi = sighting.getRSSI();
+//                Integer total = 0;
+//                long start = sighting.getTimeInMillis();
+//                long milliseconds_between_readings = start - last_timeread;
+                sightingManager.addSighting(sighting.getRSSI(),sighting.getTimeInMillis());
 
-                rssi_log.add(rssi);
-                if(rssi_log.size() > 3){
-                    rssi_log.remove(0);
-                }
-                Iterator<Integer> log_iter = rssi_log.iterator();
-                while(log_iter.hasNext())
-                {
-                    Integer val = log_iter.next();
-                    total += val;
-                }
-                Integer avg_rssi = total/rssi_log.size();
-                textView.setText(String.format("RSSI:%d seconds:%d", avg_rssi, milliseconds_between_readings));
+//                rssi_log.add(rssi);
+//                if(rssi_log.size() > 3){
+//                    rssi_log.remove(0);
+//                }
+//                Iterator<Integer> log_iter = rssi_log.iterator();
+//                while(log_iter.hasNext())
+//                {
+//                    Integer val = log_iter.next();
+//                    total += val;
+//                }
+//                Integer avg_rssi = total/rssi_log.size();
+//                textView.setText(String.format("RSSI:%d seconds:%d", avg_rssi, milliseconds_between_readings));
+//
+//                switch(state) {
+//                    case READYTOHIT:
+//                        resultTextView.setText("Ready to Hit");
+//                        if(avg_rssi < -65) {
+//                            hit_start_time = start;
+//                            state = GameState.BALLINFLIGHT;
+//                        }
+//                        break;
+//                    case BALLINFLIGHT:
+//                        long time_since_hit =  start - hit_start_time;
+//                        resultTextView.setText(String.format("Ball in Flight (seconds elapsed: %d)", time_since_hit));
+//                        if(time_since_hit > 5000) {
+//                            long avg_mbr = (milliseconds_between_readings + previous_mbr)/2;
+//                            if (avg_rssi <= -97) {
+//                                //(avg_mbr > 1000){
+//                                resultTextView.setText(String.format("HomeRun!!!!"));
+//                            } else {
+//                                resultTextView.setText(String.format("Out!!!!"));
+//                                dust();
+//                            }
+//                            state = GameState.RETURNBALL;
+//                        }
+//                        break;
+//                    case RETURNBALL:
+//                        if(avg_rssi > -55){
+//                            state = GameState.READYTOHIT;
+//                        }
+//                        break;
+//                }
+//
+//                previous_mbr = milliseconds_between_readings;
+//                last_timeread = start;
+            }
+        };
+        ScheduledExecutorService code = Executors.newSingleThreadScheduledExecutor();
 
+        code.scheduleAtFixedRate(new Runnable() {
+            @Override
+            public void run() {
+                Integer avgRssi = sightingManager.avgRssi();
+                MySighting currentSighting = sightingManager.mostRecentSighting();
                 switch(state) {
                     case READYTOHIT:
                         resultTextView.setText("Ready to Hit");
-                        if(avg_rssi < -65) {
-                            hit_start_time = start;
+                        if(avgRssi < -65) {
+                            hit_start_time = currentSighting.getStartTime();
                             state = GameState.BALLINFLIGHT;
                         }
                         break;
                     case BALLINFLIGHT:
-                        long time_since_hit =  start - hit_start_time;
+                        long time_since_hit =  currentSighting.getStartTime() - hit_start_time;
                         resultTextView.setText(String.format("Ball in Flight (seconds elapsed: %d)", time_since_hit));
                         if(time_since_hit > 5000) {
-                            long avg_mbr = (milliseconds_between_readings + previous_mbr)/2;
-                            if (avg_rssi <= -97) {
-                                //(avg_mbr > 1000){
-                                resultTextView.setText(String.format("HomeRun!!!!"));
+                            if (avgRssi <= -97) {
+                                resultTextView.setText("HomeRun!!!!");
                             } else {
-                                resultTextView.setText(String.format("Out!!!!"));
+                                resultTextView.setText("Out!!!!");
                                 dust();
                             }
                             state = GameState.RETURNBALL;
                         }
                         break;
                     case RETURNBALL:
-                        if(avg_rssi > -55){
+                        if(avgRssi > -55){
                             state = GameState.READYTOHIT;
                         }
                         break;
                 }
-
-                previous_mbr = milliseconds_between_readings;
-                last_timeread = start;
             }
-        };
+        },0,1, TimeUnit.SECONDS);
+
 
         placeManager = PlaceManager.getInstance();
         placeManager.addListener(placeEventListener);
