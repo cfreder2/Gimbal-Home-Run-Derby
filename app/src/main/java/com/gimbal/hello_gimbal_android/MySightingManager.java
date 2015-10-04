@@ -2,7 +2,7 @@ package com.gimbal.hello_gimbal_android;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-//s
+
 public class MySightingManager {
     private ArrayList<MySighting> sightingLog;
     private Integer maxSize;
