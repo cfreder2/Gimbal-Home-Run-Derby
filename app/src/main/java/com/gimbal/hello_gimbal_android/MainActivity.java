@@ -2,8 +2,6 @@ package com.gimbal.hello_gimbal_android;
 
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
-import android.widget.ArrayAdapter;
-
 
 import com.gimbal.android.CommunicationManager;
 import com.gimbal.android.Gimbal;
@@ -12,16 +10,17 @@ import com.gimbal.android.PlaceManager;
 import com.gimbal.android.Visit;
 import com.gimbal.android.BeaconSighting;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import android.os.Handler;
 
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.view.*;
 import android.view.animation.AccelerateInterpolator;
 import com.plattysoft.leonids.modifiers.AlphaModifier;
 import com.plattysoft.leonids.ParticleSystem;
 import com.plattysoft.leonids.modifiers.ScaleModifier;
+
+import android.media.MediaPlayer;
 
 enum GameState {
     READYTOHIT, BALLINFLIGHT, RETURNBALL
@@ -32,39 +31,51 @@ public class MainActivity extends ActionBarActivity {
     private PlaceManager placeManager;
     private PlaceEventListener placeEventListener;
     private TextView textView;
-//    private ArrayList<Integer> rssi_log = new ArrayList<>();
-    private TextView resultTextView;
-//    private long last_timeread = 0;
-//    private long previous_mbr = 0;
     private long hit_start_time = 0;
     private GameState state;
+    private GameState prev_state;
     private MySightingManager sightingManager = new MySightingManager(3);
+    private ImageView imageView;
 
     public void selfDestruct(View view) {
-        ParticleSystem ps = new ParticleSystem(this, 100, R.drawable.star_pink, 800);
+        ParticleSystem ps = new ParticleSystem(this, 100, R.drawable.star_blue, 800);
         ps.setScaleRange(0.7f, 1.3f);
         ps.setSpeedRange(0.1f, 0.25f);
         ps.setRotationSpeedRange(90, 180);
         ps.setFadeOut(200, new AccelerateInterpolator());
         ps.oneShot(view, 70);
 
-
         ParticleSystem ps2 = new ParticleSystem(this, 100, R.drawable.star_white, 800);
         ps2.setScaleRange(0.7f, 1.3f);
         ps2.setSpeedRange(0.1f, 0.25f);
-        ps.setRotationSpeedRange(90, 180);
+        ps2.setRotationSpeedRange(90, 180);
         ps2.setFadeOut(200, new AccelerateInterpolator());
         ps2.oneShot(view, 70);
+
+        ParticleSystem ps3 = new ParticleSystem(this, 100, R.drawable.star_gold, 800);
+        ps3.setScaleRange(0.7f, 1.3f);
+        ps3.setSpeedRange(0.1f, 0.25f);
+        ps3.setRotationSpeedRange(90, 180);
+        ps3.setFadeOut(200, new AccelerateInterpolator());
+        ps3.oneShot(view, 70);
     }
 
-    public void dust() {
+    public void dust(View view) {
         new ParticleSystem(this, 4, R.drawable.dust, 3000)
         .setSpeedByComponentsRange(-0.025f, 0.025f, -0.06f, -0.08f)
                 .setAcceleration(0.00001f, 30)
                 .setInitialRotationRange(0, 360)
                 .addModifier(new AlphaModifier(255, 0, 1000, 3000))
                 .addModifier(new ScaleModifier(0.5f, 2f, 0, 1000))
-                .oneShot(findViewById(R.id.emiter_bottom), 4);
+                .oneShot(view, 4);
+
+        new ParticleSystem(this, 4, R.drawable.dust, 3000)
+                .setSpeedByComponentsRange(0.034f, 0.020f, 0.06f, -0.08f)
+                .setAcceleration(0.00001f, 30)
+                .setInitialRotationRange(0, 270)
+                .addModifier(new AlphaModifier(255, 0, 1000, 3000))
+                .addModifier(new ScaleModifier(0.5f, 2f, 0, 1000))
+                .oneShot(view, 4);
     }
 
     @Override
@@ -73,19 +84,12 @@ public class MainActivity extends ActionBarActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //listAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_expandable_list_item_1);
-        //listView = (ListView) findViewById(R.id.list);
-        //listView.setAdapter(listAdapter);
         textView = (TextView) findViewById(R.id.RSSI);
-        textView.setText("text you want to display");
+        imageView = (ImageView) findViewById(R.id.imgStatus);
 
-        resultTextView = (TextView) findViewById(R.id.result);
-        resultTextView.setText("Waiting for Homerun");
-        //listAdapter.add("Setting Gimbal API Key");
-        //listAdapter.notifyDataSetChanged();
         Gimbal.setApiKey(this.getApplication(), "c2e44ce5-3f4b-4d3f-8655-3615974371c6");
 
-        state = GameState.READYTOHIT;
+        state = GameState.RETURNBALL; //probably needs to be in onVisitStart?
 
         placeEventListener = new PlaceEventListener() {
             @Override
@@ -95,101 +99,92 @@ public class MainActivity extends ActionBarActivity {
 
             @Override
             public void onVisitEnd(Visit visit) {
+                MediaPlayer.create(MainActivity.this, R.raw.fireworks).start();
                 textView.setText(String.format("End Visit for %s", visit.getPlace().getName()));
+                imageView.setImageResource(R.drawable.homerun);
+                selfDestruct(imageView); //particle effect
+                state = GameState.RETURNBALL;
             }
 
             @Override
             public void onBeaconSighting(BeaconSighting sighting, List<Visit> visits) {
-//                Integer rssi = sighting.getRSSI();
-//                Integer total = 0;
-//                long start = sighting.getTimeInMillis();
-//                long milliseconds_between_readings = start - last_timeread;
-                sightingManager.addSighting(sighting.getRSSI(),sighting.getTimeInMillis());
-
-//                rssi_log.add(rssi);
-//                if(rssi_log.size() > 3){
-//                    rssi_log.remove(0);
-//                }
-//                Iterator<Integer> log_iter = rssi_log.iterator();
-//                while(log_iter.hasNext())
-//                {
-//                    Integer val = log_iter.next();
-//                    total += val;
-//                }
-//                Integer avg_rssi = total/rssi_log.size();
-//                textView.setText(String.format("RSSI:%d seconds:%d", avg_rssi, milliseconds_between_readings));
-//
-//                switch(state) {
-//                    case READYTOHIT:
-//                        resultTextView.setText("Ready to Hit");
-//                        if(avg_rssi < -65) {
-//                            hit_start_time = start;
-//                            state = GameState.BALLINFLIGHT;
-//                        }
-//                        break;
-//                    case BALLINFLIGHT:
-//                        long time_since_hit =  start - hit_start_time;
-//                        resultTextView.setText(String.format("Ball in Flight (seconds elapsed: %d)", time_since_hit));
-//                        if(time_since_hit > 5000) {
-//                            long avg_mbr = (milliseconds_between_readings + previous_mbr)/2;
-//                            if (avg_rssi <= -97) {
-//                                //(avg_mbr > 1000){
-//                                resultTextView.setText(String.format("HomeRun!!!!"));
-//                            } else {
-//                                resultTextView.setText(String.format("Out!!!!"));
-//                                dust();
-//                            }
-//                            state = GameState.RETURNBALL;
-//                        }
-//                        break;
-//                    case RETURNBALL:
-//                        if(avg_rssi > -55){
-//                            state = GameState.READYTOHIT;
-//                        }
-//                        break;
-//                }
-//
-//                previous_mbr = milliseconds_between_readings;
-//                last_timeread = start;
+                sightingManager.addSighting(sighting.getRSSI(), sighting.getTimeInMillis());
             }
         };
-        ScheduledExecutorService code = Executors.newSingleThreadScheduledExecutor();
 
-        code.scheduleAtFixedRate(new Runnable() {
+        Timer timer = new Timer();
+        timer.schedule( new TimerTask() {
             @Override
             public void run() {
-                Integer avgRssi = sightingManager.avgRssi();
-                MySighting currentSighting = sightingManager.mostRecentSighting();
-                switch(state) {
-                    case READYTOHIT:
-                        resultTextView.setText("Ready to Hit");
-                        if(avgRssi < -65) {
-                            hit_start_time = currentSighting.getStartTime();
-                            state = GameState.BALLINFLIGHT;
-                        }
-                        break;
-                    case BALLINFLIGHT:
-                        long time_since_hit =  currentSighting.getStartTime() - hit_start_time;
-                        resultTextView.setText(String.format("Ball in Flight (seconds elapsed: %d)", time_since_hit));
-                        if(time_since_hit > 5000) {
-                            if (avgRssi <= -97) {
-                                resultTextView.setText("HomeRun!!!!");
-                            } else {
-                                resultTextView.setText("Out!!!!");
-                                dust();
-                            }
-                            state = GameState.RETURNBALL;
-                        }
-                        break;
-                    case RETURNBALL:
-                        if(avgRssi > -55){
-                            state = GameState.READYTOHIT;
-                        }
-                        break;
-                }
-            }
-        },0,1, TimeUnit.SECONDS);
+                MainActivity.this.runOnUiThread(new Runnable() {
+                    public void run() {
+                        Integer avgRssi = sightingManager.avgRssi();
+                        long startTime = sightingManager.lastSightingTime();
+                        float latency = (float)(System.currentTimeMillis() - startTime ) / 1000.0f;
+                        textView.setText(String.format("Avg RSSI:%d, latency(sec):%.1f", avgRssi, latency));
 
+                        Boolean playNewSound = false;
+                        int audioID = -1;
+                        switch (state) {
+                            case READYTOHIT:
+                                imageView.setImageResource(R.drawable.batterup);
+
+                                if (avgRssi <= -60) {
+                                    hit_start_time =  sightingManager.lastSightingTime();
+                                    sightingManager.setHitStarted();
+                                    state = GameState.BALLINFLIGHT;
+                                    audioID = R.raw.homerun;
+                                    playNewSound = true;
+                                }
+                                break;
+                            case BALLINFLIGHT:
+                                long time_since_hit = System.currentTimeMillis() - hit_start_time;
+                                textView.setText(String.format("Avg RSSI:%d, latency(sec):%.1f, bif(sec): %.1f)", avgRssi, latency, (float) time_since_hit / 1000f));
+                                imageView.setImageResource(R.drawable.baseball);
+
+                                if(time_since_hit >=5000) {
+                                    if (avgRssi <= -90) {
+                                        audioID = R.raw.fireworks;
+                                        imageView.setImageResource(R.drawable.homerun);
+                                        selfDestruct(imageView); //particle effect
+                                        state = GameState.RETURNBALL;
+                                        playNewSound = true;
+                                    } else if (sightingManager.isReadingCompleted()) {
+                                        imageView.setImageResource(R.drawable.yourout);
+                                        audioID = R.raw.yourout;
+                                        dust(imageView); //particle effect
+                                        state = GameState.RETURNBALL;
+                                        playNewSound = true;
+                                    }
+                                }
+
+                                break;
+                            case RETURNBALL:
+                                if (avgRssi > -55) {
+                                    playNewSound = true;
+
+                                    if((avgRssi*-1)%3 == 0) {
+                                        audioID = R.raw.uptobat2;
+                                    }
+                                    else {
+                                        audioID = R.raw.uptobat;
+                                    }
+
+                                    state = GameState.READYTOHIT;
+
+                                }
+                                sightingManager.clearHitStarted();
+                                break;
+                            default:
+                                break;
+                        }
+                        if(playNewSound){
+                            MediaPlayer.create(MainActivity.this, audioID).start();
+                        }
+                    }
+                });
+            }
+        }, 0, 500); //delay 0, wait every 500 then call yourself again.
 
         placeManager = PlaceManager.getInstance();
         placeManager.addListener(placeEventListener);
